@@ -12,21 +12,21 @@
 int main(void)
 {
     Command com;
-    int num=1; // keep track of number fo commands. 
-    
-    // prompt for and read in first command. 
+    int num = 1; // keep track of number of commands.
+
+    // prompt for and read in first command.
     cout << ">>>> ";
     com.read();
-    
-    while(com.name() != "exit")
+
+    while (com.name() != "exit")
     {
         // print out current command
         cout << num++ << ")" << com << endl;
-        
+
         // prompt for and read next command
-	cout << ">>>> ";
+        cout << ">>>> ";
         com.read();
     }
-    
+
     cout << "Thank you for using mini-shell. We now return you to your regularly scheduled shell!" << endl;
 }
