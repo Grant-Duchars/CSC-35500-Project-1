@@ -4,8 +4,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "Command.hpp"
+
+using namespace std;
 
 void execPipedCom(int p[2], int WoR, Command com);
 
@@ -55,7 +58,18 @@ int main(void)
                 }
                 else // Command was not piped
                 {
-
+                    if (com.redirIn()) // Set stdin to file if redirect in
+                    {
+                        FILE *fp = fopen(com.inputRedirectFile().c_str(), "r");
+                        dup2(fileno(fp), fileno(stdin));
+                        fclose(fp);
+                    }
+                    if (com.redirOut()) // Set stdout to file if redirect out
+                    {
+                        FILE *fp = fopen(com.outputRedirectFile().c_str(), "w");
+                        dup2(fileno(fp), fileno(stdin));
+                        fclose(fp);
+                    }
                     int numArgs = com.numArgs();
                     char *execArgs[numArgs + 1];
                     for (int i = 0; i <= numArgs; ++i)
@@ -77,22 +91,26 @@ void execPipedCom(int p[2], int RoW, Command com)
 {
     if (RoW == 1) // Forked proccess running command to be piped to
     {
-        close(p[1]);               // Close pipe writer **IMPORTANT**
-        com.read();                // Read command to be piped to
-        dup2(p[0], fileno(stdin)); // Set stdin to pipe reader
+        close(p[1]);                      // Close pipe writer **IMPORTANT**
+        com.read();                       // Read command to be piped to
+        dup2(p[0], fileno(STDIN_FILENO)); // Set stdin to pipe reader
+        if (com.redirOut())               // Set stdout to file if redirect out
+        {
+            FILE *fp = fopen(com.outputRedirectFile().c_str(), "w");
+            dup2(fileno(fp), fileno(stdin));
+            fclose(fp);
+        }
     }
     else // Forked proccess running command to be piped from
     {
         close(p[0]);                // Close the pipe reader
         dup2(p[1], fileno(stdout)); // Set stdout to pipe writer
-    }
-    if (com.redirIn()) // See if command input was redirected
-    {
-        FILE *fp = fopen(com.inputRedirectFile().c_str(), "r");
-        dup2(fileno(fp), fileno(stdin));
-    }
-    else if (com.redirOut()) // See if command output was redirected
-    {
+        if (com.redirIn())          // Set stdin to file if redirect in
+        {
+            FILE *fp = fopen(com.inputRedirectFile().c_str(), "r");
+            dup2(fileno(fp), fileno(stdin));
+            fclose(fp);
+        }
     }
     int numArgs = com.numArgs();
     char *execArgs[numArgs + 1];
