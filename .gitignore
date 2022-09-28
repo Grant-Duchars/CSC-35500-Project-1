@@ -55,4 +55,7 @@
 # Ignore code-workspaces
 *.code-workspace
 
+*.txt
+proj1
+
 # End of https://www.toptal.com/developers/gitignore/api/c++,visualstudiocode

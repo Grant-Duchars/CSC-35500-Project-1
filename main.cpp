@@ -61,20 +61,24 @@ int main(void)
                     if (com.redirIn()) // Set stdin to file if redirect in
                     {
                         FILE *fp = fopen(com.inputRedirectFile().c_str(), "r");
-                        dup2(fileno(fp), fileno(stdin));
+                        dup2(fileno(fp), STDIN_FILENO);
                         fclose(fp);
                     }
                     if (com.redirOut()) // Set stdout to file if redirect out
                     {
                         FILE *fp = fopen(com.outputRedirectFile().c_str(), "w");
-                        dup2(fileno(fp), fileno(stdin));
+                        dup2(fileno(fp), STDOUT_FILENO);
                         fclose(fp);
                     }
-                    int numArgs = com.numArgs();
-                    char *execArgs[numArgs + 1];
-                    for (int i = 0; i <= numArgs; ++i)
-                        i != numArgs ? strcpy(execArgs[i], com.args()[i].c_str()) : execArgs[i] = NULL;
-                    return 0;
+                    int numArgs = com.numArgs();       // Get number of entered arguments
+                    char *execArgs[10];                // Create array to store arguments for exec to run
+                    for (int i = 0; i <= numArgs; ++i) // Loop through arguments and add to array
+                    {                                  // After all arguments added to array, append NULL
+                        i != numArgs ? execArgs[i] = (char *)com.args()[i].c_str() : execArgs[i] = NULL;
+                    }
+                    int errno = execvp(execArgs[0], execArgs); // Run exec and store any error number if exec fails
+                    cerr << "Uh Oh! You shouldn't be here. Exec failed with error: " << errno << endl;
+                    return 1;
                 }
             }
         }
@@ -91,29 +95,29 @@ void execPipedCom(int p[2], int RoW, Command com)
 {
     if (RoW == 1) // Forked proccess running command to be piped to
     {
-        close(p[1]);                      // Close pipe writer **IMPORTANT**
-        com.read();                       // Read command to be piped to
-        dup2(p[0], fileno(STDIN_FILENO)); // Set stdin to pipe reader
-        if (com.redirOut())               // Set stdout to file if redirect out
+        close(p[1]);              // Close pipe writer **IMPORTANT**
+        com.read();               // Read command to be piped to
+        dup2(p[0], STDIN_FILENO); // Set stdin to pipe reader
+        if (com.redirOut())       // Set stdout to file if redirect out
         {
             FILE *fp = fopen(com.outputRedirectFile().c_str(), "w");
-            dup2(fileno(fp), fileno(stdin));
+            dup2(fileno(fp), STDIN_FILENO);
             fclose(fp);
         }
     }
     else // Forked proccess running command to be piped from
     {
-        close(p[0]);                // Close the pipe reader
-        dup2(p[1], fileno(stdout)); // Set stdout to pipe writer
-        if (com.redirIn())          // Set stdin to file if redirect in
+        close(p[0]);               // Close the pipe reader
+        dup2(p[1], STDOUT_FILENO); // Set stdout to pipe writer
+        if (com.redirIn())         // Set stdin to file if redirect in
         {
             FILE *fp = fopen(com.inputRedirectFile().c_str(), "r");
-            dup2(fileno(fp), fileno(stdin));
+            dup2(fileno(fp), STDIN_FILENO);
             fclose(fp);
         }
     }
     int numArgs = com.numArgs();
-    char *execArgs[numArgs + 1];
+    char *execArgs[10];
     for (int i = 0; i <= numArgs; ++i)
         i != numArgs ? strcpy(execArgs[i], com.args()[i].c_str()) : execArgs[i] = NULL;
     execvp(execArgs[0], execArgs);
