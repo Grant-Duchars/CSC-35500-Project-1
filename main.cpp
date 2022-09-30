@@ -1,11 +1,18 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/wait.h>
+#include <signal.h>
+#include <unordered_map>
+#include <sstream>
 
 #include "Command.hpp"
 
+using namespace std;
+
 int execCommand(Command com);
 int setUpPipedCommand(Command com);
+
+extern unordered_map<int, string> umap;
 
 int main(void)
 {
@@ -21,10 +28,19 @@ int main(void)
             int pid = fork();
             if (pid != 0) // Parent Shell (Will wait on child to finish running command unless backgrounded)
             {
+                std::ostringstream osstream;
+                com.print(osstream);
+                string commandStr = osstream.str();
                 while (com.pipeOut()) // Read through command until not piping
+                {
                     com.read();
+                    com.print(osstream);
+                    commandStr = osstream.str();
+                }
                 if (!com.backgrounded()) // If not told to background, wait until child finishes executing
                     waitpid(pid, NULL, 0);
+                else
+                    umap[pid] = commandStr;
             }
             else // Child Process (Will execute the given command and will terminate when command is finished)
                 return com.pipeOut() ? setUpPipedCommand(com) : execCommand(com);
@@ -93,4 +109,15 @@ int setUpPipedCommand(Command com)
         dup2(p[1], STDOUT_FILENO); // Set stdout to pipe writer
     }
     return execCommand(com);
+}
+
+void backgroundedHandler(int sig)
+{
+    int pid;
+    int status;
+    pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+    if (pid > 0)
+    {
+        printf("Completed: PID = %d : %s", umap.first, umap.second.c_str());
+    }
 }
