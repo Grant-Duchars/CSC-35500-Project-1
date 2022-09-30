@@ -11,8 +11,9 @@ using namespace std;
 
 int execCommand(Command com);
 int setUpPipedCommand(Command com);
+void backgroundedHandler(int sig);
 
-extern unordered_map<int, string> umap;
+unordered_map<int, string> umap; // Hashmap for storing backgrounded commands
 
 int main(void)
 {
@@ -28,19 +29,24 @@ int main(void)
             int pid = fork();
             if (pid != 0) // Parent Shell (Will wait on child to finish running command unless backgrounded)
             {
-                std::ostringstream osstream;
-                com.print(osstream);
-                string commandStr = osstream.str();
-                while (com.pipeOut()) // Read through command until not piping
-                {
-                    com.read();
-                    com.print(osstream);
-                    commandStr = osstream.str();
-                }
                 if (!com.backgrounded()) // If not told to background, wait until child finishes executing
-                    waitpid(pid, NULL, 0);
-                else
-                    umap[pid] = commandStr;
+                {
+                    while (com.pipeOut()) // Read through command until not piping
+                        com.read();
+                    waitpid(pid, NULL, 0); // Wait on child to finish executing
+                }
+                else // Backgrounded, setup child signal
+                {
+                    std::ostringstream osstream;
+                    com.print(osstream);
+                    while (com.pipeOut()) // Read through command until not piping
+                    {
+                        com.read();
+                        com.print(osstream);
+                    }
+                    umap[pid] = osstream.str();           // Save backgrounded command to hashmap
+                    signal(SIGCHLD, backgroundedHandler); // Setup signal handler
+                }
             }
             else // Child Process (Will execute the given command and will terminate when command is finished)
                 return com.pipeOut() ? setUpPipedCommand(com) : execCommand(com);
@@ -111,13 +117,16 @@ int setUpPipedCommand(Command com)
     return execCommand(com);
 }
 
+/**
+ * Backgrounded command handler. Called when child executing backgrounded command terminates.
+ * @param sig SIGCHLD
+ */
 void backgroundedHandler(int sig)
 {
-    int pid;
-    int status;
-    pid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+    int pid = waitpid(-1, NULL, WUNTRACED | WNOHANG); // Reap child
     if (pid > 0)
     {
-        printf("Completed: PID = %d : %s", umap.first, umap.second.c_str());
+        printf("Completed: PID = %d : %s\n", pid, umap.at(pid).c_str()); // Print out that backgrounded command finished
+        umap.erase(pid);
     }
 }
